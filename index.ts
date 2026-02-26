@@ -6,10 +6,14 @@ import {
 } from "./env.js";
 
 const TOOL_CATEGORY_MAP: Record<string, string> = {
+  // Bash / shell
   bash: "bash",
   shell: "bash",
   exec: "bash",
   terminal: "bash",
+  run_terminal_cmd: "bash",
+  run_command: "bash",
+  // Filesystem
   read: "filesystem",
   write: "filesystem",
   edit: "filesystem",
@@ -18,15 +22,29 @@ const TOOL_CATEGORY_MAP: Record<string, string> = {
   grep: "filesystem",
   file_search: "filesystem",
   multi_edit: "filesystem",
+  str_replace_editor: "filesystem",
+  str_replace: "filesystem",
+  view_file: "filesystem",
+  create_file: "filesystem",
+  delete_file: "filesystem",
+  search_files: "filesystem",
+  // Browser / computer
   browser: "browser",
   browser_navigate: "browser",
   browser_click: "browser",
   browser_type: "browser",
   browser_snapshot: "browser",
+  browser_fill: "browser",
+  browser_scroll: "browser",
+  computer: "browser",
+  computer_use: "browser",
+  // Network
   web_fetch: "network",
   web_search: "network",
   http: "network",
   curl: "network",
+  mcp: "network",
+  // Canvas / notebook
   canvas: "canvas",
   notebook: "canvas",
 };
@@ -46,7 +64,7 @@ interface FarameshConfig {
   fail_closed?: boolean;
   agent_id_override?: string;
   api_key?: string;
-  /** When > 0, after creating a pending-approval action we poll Faramesh until approved/denied or this many ms. Set to 0 (default) to block immediately and tell the user to approve in the dashboard, then retry. */
+  /** When > 0, after creating a pending-approval action we poll Faramesh until approved/denied or this many ms elapsed. Set to 0 (default) to block immediately and tell the user to approve in the dashboard, then retry. */
   wait_for_approval_ms?: number;
   /** Dashboard URL for "manage policy" / "approve here" links. Default: base_url with port 3000 (Vue app). */
   dashboard_url?: string;
@@ -65,34 +83,28 @@ interface FarameshCheckResponse {
   category?: string;
 }
 
-interface CheckOnlyResponse {
-  decision?: string;
-  status?: string;
-  reason?: string;
-  reason_code?: string;
-  category?: string;
-}
-
 /** Blocked by Faramesh policy (immediate deny). */
 function formatPolicyDeny(reason: string, reasonCode: string, category: string, dashboardUrl: string): string {
-  return `Blocked by Faramesh policy. Reason: ${reason}. Code: ${reasonCode}. Category: ${category}. Manage policy: ${dashboardUrl}`;
+  return `[Faramesh DENY] Blocked by Faramesh policy. Reason: ${reason}. Code: ${reasonCode}. Category: ${category}. Manage policy: ${dashboardUrl}`;
 }
 
-/** Waiting approval from Faramesh UI — short message for the agent to show the user. */
+/** Blocked by human after pending approval — denied in Faramesh UI. */
+function formatHumanDenied(dashboardUrl: string): string {
+  return `[Faramesh DENY] Blocked by human: this action was denied in the Faramesh UI. Review at: ${dashboardUrl}`;
+}
+
+/** Waiting for human approval in Faramesh UI. */
 function formatPending(actionId: string | undefined, dashboardUrl: string): string {
   const idPart = actionId ? ` Action ID: ${actionId}.` : "";
-  return `Waiting approval from Faramesh UI.${idPart} Approve at ${dashboardUrl}, then ask me to try again.`;
+  return `[Faramesh PENDING] Waiting for approval.${idPart} Approve at ${dashboardUrl}, then ask me to try again.`;
 }
 
-/** Blocked by human (denied in Faramesh UI after pending). */
-function formatHumanDenied(): string {
-  return "Blocked by human: this action was denied in the Faramesh UI.";
-}
-
+/** Approval window expired — user can still approve and retry. */
 function formatTimeout(actionId: string, dashboardUrl: string): string {
-  return `Approval window expired. Action ID: ${actionId}. You can still approve at ${dashboardUrl} and ask me to try again.`;
+  return `[Faramesh PENDING TIMEOUT] Approval window expired. Action ID: ${actionId}. You can still approve at ${dashboardUrl} and ask me to try again.`;
 }
 
+/** Faramesh unreachable — fail-closed. */
 function formatUnreachable(message: string): string {
   return `[Faramesh ERROR] Governance service unreachable (fail-closed). ${message}`;
 }
@@ -123,29 +135,6 @@ async function fetchWithRetry(
     }
   }
   throw lastErr ?? new Error("fetchWithRetry failed");
-}
-
-async function checkOnly(
-  baseUrl: string,
-  payload: Record<string, unknown>,
-  timeoutMs: number,
-  apiKey?: string,
-): Promise<CheckOnlyResponse> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-  const tenant = (payload?.context as Record<string, unknown>)?.tenant_id ?? "demo";
-  headers["X-Tenant-ID"] = String(tenant);
-
-  const res = await fetchWithRetry(
-    `${baseUrl}/v1/actions/check`,
-    { method: "POST", headers, body: JSON.stringify(payload) },
-    timeoutMs,
-  );
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Faramesh check returned ${res.status}: ${text}`);
-  }
-  return (await res.json()) as CheckOnlyResponse;
 }
 
 async function createAction(
@@ -190,8 +179,7 @@ async function getActionStatus(
     timeoutMs,
   );
   if (!res.ok) return {};
-  const data = (await res.json()) as { status?: string };
-  return data;
+  return (await res.json()) as { status?: string };
 }
 
 async function waitForApproval(
@@ -277,55 +265,47 @@ const plugin = {
         };
 
         try {
-          // Always create an action so every tool call appears in the Faramesh dashboard (audit visibility).
+          // Always POST to /v1/actions so every tool call is recorded in the Faramesh dashboard.
           const result = await createAction(baseUrl, payload, timeoutMs, apiKey);
           const status = (result.status ?? result.decision ?? "").toLowerCase();
           const actionId = result.id ?? result.action_id;
-          const tenant = (payload?.context as Record<string, unknown>)?.tenant_id as string | undefined ?? "demo";
+          const tenant = (payload.context as Record<string, unknown>)?.tenant_id as string | undefined ?? "demo";
 
+          // Allowed — tool proceeds, nothing shown to agent.
           if (status === "allowed" || status === "allow") return undefined;
 
+          // Denied immediately by policy or by a human.
           if (status === "denied" || status === "deny") {
             const reason = result.reason ?? `Blocked by policy (${event.toolName})`;
             const code = result.reason_code ?? "faramesh-deny";
-            const category = result.category ?? resolveCategory(event.toolName);
-            const isHumanDenied = (code ?? "").toLowerCase() === "human_denied" || /human|denied by human/i.test(reason ?? "");
+            const cat = result.category ?? category;
+            const isHumanDenied =
+              (code ?? "").toLowerCase() === "human_denied" ||
+              /human|denied by human/i.test(reason ?? "");
             return {
               block: true,
-              blockReason: isHumanDenied ? formatHumanDenied() : formatPolicyDeny(reason, code, category, dashboardUrl),
+              blockReason: isHumanDenied
+                ? formatHumanDenied(dashboardUrl)
+                : formatPolicyDeny(reason, code, cat, dashboardUrl),
             };
           }
 
-          // pending_approval: block immediately so the agent can tell the user to approve in the dashboard (no silent polling).
+          // Pending approval — optionally poll, otherwise block and tell user to approve.
           if (waitForApprovalMs > 0 && actionId) {
             const outcome = await waitForApproval(baseUrl, actionId, waitForApprovalMs, apiKey, tenant);
             if (outcome === "approved") return undefined;
             if (outcome === "denied") {
-              return {
-                block: true,
-                blockReason: formatHumanDenied(),
-              };
+              return { block: true, blockReason: formatHumanDenied(dashboardUrl) };
             }
-            return {
-              block: true,
-              blockReason: formatTimeout(actionId, dashboardUrl),
-            };
+            return { block: true, blockReason: formatTimeout(actionId, dashboardUrl) };
           }
 
-          return {
-            block: true,
-            blockReason: formatPending(actionId, dashboardUrl),
-          };
+          return { block: true, blockReason: formatPending(actionId, dashboardUrl) };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-
           if (failClosed) {
-            return {
-              block: true,
-              blockReason: formatUnreachable(message),
-            };
+            return { block: true, blockReason: formatUnreachable(message) };
           }
-
           return undefined;
         }
       },
