@@ -1,42 +1,47 @@
 # Faramesh plugin for OpenClaw
 
-**npm package:** `@faramesh/openclaw` — Plugin id in OpenClaw config: **openclaw**.
+**npm package:** `@faramesh/openclaw` · **Plugin id:** `openclaw`
 
-Governance for every tool call: **Allow**, **Ask** (human approval), or **Deny** via the Faramesh policy engine. All interception happens in code (before execution), so it’s immune to prompt injection.
+Governance for every tool call: **Allow**, **Ask** (human approval), or **Deny** — enforced at the code level before execution, immune to prompt injection.
 
-## One-line install
-
-**From npm (recommended):**
+## Install
 
 ```bash
 openclaw plugins install @faramesh/openclaw
 ```
 
-**From a local clone of this repo:**
+Then add `openclaw` to `plugins.allow` in your OpenClaw config.
 
-```bash
-git clone https://github.com/faramesh/Openclaw-Plugin.git
-cd Openclaw-Plugin
-openclaw plugins install .
-# or link for development:
-openclaw plugins install -l .
+No other config needed if Faramesh runs at `http://127.0.0.1:8000`. To point at a different server:
+
+```yaml
+plugins:
+  allow:
+    - openclaw
+  entries:
+    openclaw:
+      config:
+        base_url: "http://your-faramesh-server:8000"
+        api_key: "your-api-key"   # optional
 ```
 
-Add **openclaw** to `plugins.allow`. No other config needed if Faramesh runs at `http://127.0.0.1:8000`. Otherwise set `FARAMESH_BASE_URL` or `plugins.entries.openclaw.config.base_url` and optional `api_key`. (For legacy configs that already use `faramesh` as the plugin id, the plugin will still read `plugins.entries.faramesh` as a fallback.)
+You can also set `FARAMESH_BASE_URL` and `FARAMESH_API_KEY` as environment variables instead.
 
 ## What it does
 
-- **Before every tool run** (bash, file, browser, etc.), the plugin sends the action to Faramesh (`POST /v1/actions`). Every call is registered in the Faramesh UI. Depending on policy you get:
-  - **Allow** — tool runs (action still recorded).
-  - **Pending** — "Waiting approval from Faramesh UI. Approve at &lt;url&gt;, then ask me to try again." User approves in dashboard, then retries.
-  - **Blocked by Faramesh policy** — "Blocked by Faramesh policy. Reason: …"
-  - **Blocked by human** — If a pending action was denied in the UI: "Blocked by human: this action was denied in the Faramesh UI."
-- **Plugin = code-level** (like SecureClaw’s “Tier 1: Plugin”). No skill required for interception.
-- **Skill** (optional): The plugin includes a small skill so the agent can explain “pending approval” / “denied” to the user. Improves UX only.
+Before every tool call (bash, file, browser, network, etc.) the plugin submits the action to Faramesh (`POST /v1/actions`). Every call is recorded in the Faramesh dashboard. The outcome is one of:
+
+| Outcome | What the agent sees |
+|---|---|
+| **Allow** | Nothing — the tool runs. |
+| **Pending approval** | `[Faramesh PENDING]` — waits for a human to approve in the dashboard. |
+| **Denied by policy** | `[Faramesh DENY]` — blocked by a policy rule. |
+| **Denied by human** | `[Faramesh DENY]` — a human denied it in the dashboard. |
+| **Service unreachable** | `[Faramesh ERROR]` — fail-closed, tool does not run. |
+
+The included **skill** teaches the agent how to explain each outcome to the user and where to approve or change policy.
 
 ## Requirements
 
-- OpenClaw (gateway or TUI).
-- Faramesh server (Horizon or self-hosted) running; use `FARAMESH_DEMO=1` for local testing.
-
-For full Faramesh server setup, see the [Faramesh documentation](https://faramesh.dev/docs/installing-faramesh).
+- OpenClaw (gateway or TUI)
+- Faramesh server — [Horizon (managed)](https://faramesh.dev) or [self-hosted](https://faramesh.dev/docs/installing-faramesh)
