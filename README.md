@@ -39,4 +39,4 @@ Add **openclaw** to `plugins.allow`. No other config needed if Faramesh runs at 
 - OpenClaw (gateway or TUI).
 - Faramesh server (Horizon or self-hosted) running; use `FARAMESH_DEMO=1` for local testing.
 
-For full Faramesh server setup, see the [Faramesh documentation](https://faramesh.ai/docs).
+For full Faramesh server setup, see the [Faramesh documentation](https://faramesh.dev).
