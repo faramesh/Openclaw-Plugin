@@ -1,0 +1,44 @@
+{
+  "id": "openclaw",
+  "skills": ["./skills"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "description": "Faramesh server URL (e.g. http://127.0.0.1:8000)",
+        "default": "http://127.0.0.1:8000"
+      },
+      "timeout_ms": {
+        "type": "number",
+        "description": "Timeout for Faramesh API calls in milliseconds",
+        "default": 5000
+      },
+      "fail_closed": {
+        "type": "boolean",
+        "description": "Block tool calls when Faramesh is unreachable (true) or allow them (false)",
+        "default": true
+      },
+      "agent_id_override": {
+        "type": "string",
+        "description": "Override the agent ID sent to Faramesh (defaults to session agent ID)"
+      },
+      "api_key": {
+        "type": "string",
+        "description": "Optional API key for Faramesh authentication",
+        "sensitive": true
+      },
+      "wait_for_approval_ms": {
+        "type": "number",
+        "description": "If > 0, poll Faramesh for a decision on pending_approval for this many ms; if 0, block immediately and ask the user to approve in the dashboard.",
+        "default": 0
+      },
+      "dashboard_url": {
+        "type": "string",
+        "description": "Dashboard URL for \"approve here\" links (defaults to base_url with port 3000).",
+        "default": ""
+      }
+    }
+  }
+}

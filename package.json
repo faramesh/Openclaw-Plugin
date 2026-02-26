@@ -1,0 +1,27 @@
+{
+  "name": "@faramesh/openclaw",
+  "version": "0.1.2",
+  "description": "Faramesh governance plugin for OpenClaw \u2014 intercepts every tool call for policy-based Allow/Ask/Deny, human approval workflows, and full audit logging.",
+  "main": "index.ts",
+  "keywords": [
+    "openclaw",
+    "faramesh",
+    "governance",
+    "security",
+    "policy",
+    "approval"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/faramesh/openclaw-plugin"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
