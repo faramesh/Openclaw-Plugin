@@ -6,22 +6,20 @@ Governance for every tool call: **Allow**, **Ask** (human approval), or **Deny**
 
 ## One-line install
 
-**From npm:**
+**From npm (recommended):**
+
 ```bash
 openclaw plugins install @faramesh/openclaw
 ```
 
-**From a local checkout (this repo on your machine):**
-```bash
-cd /Users/xquark_home/Faramesh-Nexus/openclaw-test
-openclaw plugins install ./extensions/faramesh
-# or link for development:
-openclaw plugins install -l ./extensions/faramesh
-```
+**From a local clone of this repo:**
 
-**One-command script (install + next steps):**
 ```bash
-./scripts/install-faramesh.sh
+git clone https://github.com/faramesh/Openclaw-Plugin.git
+cd Openclaw-Plugin
+openclaw plugins install .
+# or link for development:
+openclaw plugins install -l .
 ```
 
 Add **openclaw** to `plugins.allow`. No other config needed if Faramesh runs at `http://127.0.0.1:8000`. Otherwise set `FARAMESH_BASE_URL` or `plugins.entries.openclaw.config.base_url` and optional `api_key`. (For legacy configs that already use `faramesh` as the plugin id, the plugin will still read `plugins.entries.faramesh` as a fallback.)
@@ -50,4 +48,4 @@ Add **openclaw** to `plugins.allow`. No other config needed if Faramesh runs at 
 5. Publish: `npm publish --access public` (use OTP if 2FA enabled).
 6. Verify: `npm view @faramesh/openclaw version`.
 
-See [E2E_FARAMESH_TEST_GUIDE.md](../../E2E_FARAMESH_TEST_GUIDE.md) for full setup and testing.
+For full Faramesh server setup, see the main Faramesh documentation (Horizon or self-hosted).
