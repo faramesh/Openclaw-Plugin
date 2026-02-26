@@ -39,13 +39,4 @@ Add **openclaw** to `plugins.allow`. No other config needed if Faramesh runs at 
 - OpenClaw (gateway or TUI).
 - Faramesh server (Horizon or self-hosted) running; use `FARAMESH_DEMO=1` for local testing.
 
-## Publishing to npm (maintainers)
-
-1. Bump `version` in `package.json`.
-2. Update CHANGELOG if present.
-3. From this directory: `npm pack` (dry-run; check contents).
-4. Log in to npm: `npm login` (ensure access to `@faramesh` scope).
-5. Publish: `npm publish --access public` (use OTP if 2FA enabled).
-6. Verify: `npm view @faramesh/openclaw version`.
-
-For full Faramesh server setup, see the main Faramesh documentation (Horizon or self-hosted).
+For full Faramesh server setup, see the [Faramesh documentation](https://faramesh.ai/docs).
